@@ -1,0 +1,5 @@
+#!/bin/bash
+
+ruby receive.rb &
+ruby generate.rb &
+wait
