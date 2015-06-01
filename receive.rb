@@ -1,16 +1,16 @@
 require "coreaudio"
 require "fftw3"
 
-dev = CoreAudio.default_input_device
-frequency     = 19100
-rate          = dev.nominal_rate # 44100
-chunk_size    = 1024
-fragment_size = 256
+DEV         = CoreAudio.default_input_device
+FREQUENCY   = 19100
+RATE        = DEV.nominal_rate # 44100
+BUFFER_SIZE = 1024
+CHUNK_SIZE  = 256
 
-buf = dev.input_buffer(chunk_size)
+buf = DEV.input_buffer(BUFFER_SIZE)
 
-def process(fragment)
-  fft = FFTW3.fft(fragment).real.abs
+def process(chunk)
+  fft = FFTW3.fft(chunk).real.abs
   arr = fft.to_a
   max = arr.max.round
   sum = arr.inject(&:+).round
@@ -21,16 +21,16 @@ end
 listen_thread = Thread.start do
   read = 0
   loop do
-    waveform = buf.read(chunk_size)
+    waveform = buf.read(BUFFER_SIZE)
     channel = waveform[0, true]
 
-    (0...(chunk_size/fragment_size)).each do |i|
-      fragment = channel[i...(i+fragment_size)]
-      process(fragment)
+    (0...(BUFFER_SIZE/CHUNK_SIZE)).each do |i|
+      chunk = channel[i...(i+CHUNK_SIZE)]
+      process(chunk)
     end
 
-    read += chunk_size
-    puts "read: #{read.inspect}"
+    read += BUFFER_SIZE
+    puts "read: #{read.inspect} samples"
   end
 end
 
