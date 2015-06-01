@@ -1,20 +1,29 @@
 require "coreaudio"
+require "fftw3"
+
+CHUNK_SIZE=256
 
 dev = CoreAudio.default_input_device
-buf = dev.input_buffer(1024)
+buf = dev.input_buffer(CHUNK_SIZE)
 
 thread = Thread.start do
   loop do
-    waveform = buf.read(1024)
-    channel = waveform[0, true].to_a
-    channel.each_slice(16) do |chunk|
-      puts chunk.inspect
+    waveform = buf.read(CHUNK_SIZE)
+    channel = waveform[0, true]
+    f = FFTW3.fft(channel).real.abs
+    arr = f.to_a
+    arr.map(&:round).each_slice(16) do |s|
+      printf (" %6d" * 16)+"\n", *s
     end
+    max = arr.max.round
+    sum = arr.inject(&:+).round
+    avg = sum / arr.size
+    printf "avg: %10d, max: %10d\n", avg, max
   end
 end
 
 buf.start
-sleep 0.5
+sleep 1
 buf.stop
 
 thread.kill.join

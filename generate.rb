@@ -17,7 +17,7 @@ thread = Thread.start do
 end
 
 buf.start
-sleep 0.5
+sleep 1
 buf.stop
 
 thread.kill.join
