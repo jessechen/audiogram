@@ -1,19 +1,23 @@
 require "coreaudio"
 
-dev = CoreAudio.default_output_device
-buf = dev.output_buffer(1024)
+DEV         = CoreAudio.default_output_device
+FREQUENCY   = 19100
+RATE        = DEV.nominal_rate # 44100
+BUFFER_SIZE = 1024
+PHASE       = Math::PI * 2.0 * FREQUENCY / RATE
 
-frequency = 19100.0
-phase = Math::PI * 2.0 * frequency / dev.nominal_rate
+buf = DEV.output_buffer(BUFFER_SIZE)
+
 thread = Thread.start do
-  data = [1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1 ,1]
+  data = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1 ,1]
   i = 0
-  wav = NArray.sint(1024)
+  wav = NArray.sint(BUFFER_SIZE)
   data.each do |bit|
-    1024.times {|j| wav[j] = (0.4 * Math.sin(phase*bit*(i+j)) * 0x7FFF).round }
-    i += 1024
+    BUFFER_SIZE.times {|j| wav[j] = (0.4 * Math.sin(PHASE*bit*(i+j)) * 0x7FFF).round }
+    i += BUFFER_SIZE
     buf << wav
   end
+  puts "wrote: #{i.inspect} samples"
 end
 
 buf.start

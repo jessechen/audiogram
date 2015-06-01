@@ -4,6 +4,8 @@ GEM
     coderay (1.1.0)
     coreaudio (0.0.11)
       narray (~> 0.6.0.0)
+    fftw3 (0.3)
+      narray
     method_source (0.8.2)
     narray (0.6.0.9)
     pry (0.10.1)
@@ -17,6 +19,7 @@ PLATFORMS
 
 DEPENDENCIES
   coreaudio
+  fftw3
   pry
 
 BUNDLED WITH
