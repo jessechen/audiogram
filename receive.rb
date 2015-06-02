@@ -24,6 +24,11 @@ def highest_signal(occurrences)
   index
 end
 
+def bits_to_char(bit_array)
+  byte = bit_array.zip([128, 64, 32, 16, 8, 4, 2, 1]).reduce(0) { |acc, ary| acc + ary.reduce(&:*) }
+  [byte].pack("c")
+end
+
 def process_chunk(chunk)
   fft = FFTW3.fft(chunk).real.abs
   arr = fft.to_a
@@ -79,7 +84,6 @@ process_thread = Thread.start do
       occurrences = Hash.new(0)
     end
   end
-
 end
 
 buf.start
