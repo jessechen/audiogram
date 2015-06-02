@@ -1,13 +1,8 @@
 require "coreaudio"
 require "fftw3"
+require "./constants"
 
-DEV         = CoreAudio.default_input_device
-FREQUENCY   = 19100
-RATE        = DEV.nominal_rate # 44100
-BUFFER_SIZE = 1024
-CHUNK_SIZE  = 256
-
-buf = DEV.input_buffer(BUFFER_SIZE)
+buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 def process(chunk)
   fft = FFTW3.fft(chunk).real.abs

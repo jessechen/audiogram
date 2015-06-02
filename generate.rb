@@ -1,12 +1,7 @@
 require "coreaudio"
+require "./constants"
 
-DEV         = CoreAudio.default_output_device
-FREQUENCY   = 19100
-RATE        = DEV.nominal_rate # 44100
-BUFFER_SIZE = 1024
-PHASE       = Math::PI * 2.0 * FREQUENCY / RATE
-
-buf = DEV.output_buffer(BUFFER_SIZE)
+buf = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
 
 thread = Thread.start do
   data = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1 ,1]
