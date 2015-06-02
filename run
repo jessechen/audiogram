@@ -1,5 +1,6 @@
 #!/bin/bash
 
 ruby receive.rb &
+sleep 0.23
 ruby generate.rb &
 wait

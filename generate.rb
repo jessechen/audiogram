@@ -1,6 +1,8 @@
 require "coreaudio"
 require "./constants"
 
+Thread.abort_on_exception = true
+
 VOLUME = 0.4
 
 buf = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
@@ -19,7 +21,6 @@ thread = Thread.start do
     i += BUFFER_SIZE
     buf << wav
   end
-  puts "wrote: #{i.inspect} samples"
 end
 
 buf.start
