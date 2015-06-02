@@ -12,6 +12,18 @@ end
 buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 FRACTIONAL_BIT_STREAM = Queue.new
 
+def highest_signal(occurrences)
+  max = 0
+  index = 0
+  occurrences.each do |k, v|
+    if v > max
+      max = v
+      index = k
+    end
+  end
+  index
+end
+
 def process_chunk(chunk)
   fft = FFTW3.fft(chunk).real.abs
   arr = fft.to_a
@@ -31,7 +43,7 @@ def process_chunk(chunk)
     bits << bit if (ind & peak_indices).any?
   end
 
-  FRACTIONAL_BIT_STREAM.push(bits.inspect)
+  FRACTIONAL_BIT_STREAM.push(bits)
 end
 
 listen_thread = Thread.start do
@@ -46,9 +58,28 @@ listen_thread = Thread.start do
 end
 
 process_thread = Thread.start do
+  # calibrate
+  window = [0, 0, 0, 0]
   while bits = FRACTIONAL_BIT_STREAM.pop
-    puts bits
+    window = window[1..-1]
+    window << (bits == [1] ? 0.25 : 0)
+    break if window.inject(&:+) == 1
   end
+
+  # we're calibrated
+  puts "calibrated"
+  counter = 0
+  occurrences = Hash.new(0)
+  while bits = FRACTIONAL_BIT_STREAM.pop
+    counter += 1
+    bits.each {|bit| occurrences[bit] += 1}
+    if counter >= 4
+      puts highest_signal(occurrences)
+      counter = 0
+      occurrences = Hash.new(0)
+    end
+  end
+
 end
 
 buf.start
