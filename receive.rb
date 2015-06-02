@@ -13,15 +13,7 @@ buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 FRACTIONAL_BIT_STREAM = Queue.new
 
 def highest_signal(occurrences)
-  max = 0
-  index = 0
-  occurrences.each do |k, v|
-    if v > max
-      max = v
-      index = k
-    end
-  end
-  index
+  occurrences.max_by {|_, v| v}.first
 end
 
 def bits_to_char(bit_array)
