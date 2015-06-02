@@ -17,7 +17,7 @@ def highest_signal(occurrences)
 end
 
 def bits_to_char(bit_array)
-  byte = bit_array.zip([128, 64, 32, 16, 8, 4, 2, 1]).reduce(0) { |acc, ary| acc + ary.reduce(&:*) }
+  byte = bit_array.reduce(0) {|acc, bit| (acc * 2) + bit}
   [byte].pack("c")
 end
 
