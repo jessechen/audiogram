@@ -7,11 +7,13 @@ VOLUME = 0.4
 
 buf = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
 
+calibration = [0, 1] * 8 + [0] * 4
+data = calibration + [0, 1, 0, 0, 1, 0, 0, 0]
+freqs = data.map {|i| FREQUENCIES[i] }
+duration = data.length.to_f * BUFFER_SIZE / RATE
+
 thread = Thread.start do
   sleep WARMUP
-
-  data = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1 ,1]
-  freqs = data.map {|i| FREQUENCIES[i] }
 
   i = 0
   wav = NArray.sint(BUFFER_SIZE)
@@ -24,7 +26,7 @@ thread = Thread.start do
 end
 
 buf.start
-sleep DURATION + WARMUP
+sleep duration + WARMUP * 2
 buf.stop
 
 thread.kill.join

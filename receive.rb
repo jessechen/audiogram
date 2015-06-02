@@ -52,7 +52,7 @@ process_thread = Thread.start do
 end
 
 buf.start
-sleep DURATION + WARMUP + 1
+sleep 5
 buf.stop
 
 listen_thread.kill.join
