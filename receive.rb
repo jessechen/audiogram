@@ -2,15 +2,31 @@ require "coreaudio"
 require "fftw3"
 require "./constants"
 
+PEAK_INDICES = FREQUENCIES.map do |f|
+  i = (f.to_f / RATE * CHUNK_SIZE).round
+  [i - 1, i, i + 1]
+end
+
 buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 def process(chunk)
   fft = FFTW3.fft(chunk).real.abs
   arr = fft.to_a
-  max = arr.max.round
-  sum = arr.inject(&:+).round
-  avg = sum / arr.size
-  printf "avg: %10d, max: %10d\n", avg, max
+
+  max = arr.max
+  thresh = max * 0.90
+
+  ind = []
+  arr.each_with_index do |x, i|
+    ind << i if x > thresh
+  end
+
+  bits = []
+  PEAK_INDICES.each_with_index do |peak_indices, bit|
+    bits << bit if (ind & peak_indices).any?
+  end
+
+  puts bits.inspect
 end
 
 listen_thread = Thread.start do
@@ -30,7 +46,7 @@ listen_thread = Thread.start do
 end
 
 buf.start
-sleep 1
+sleep DURATION + WARMUP
 buf.stop
 
 listen_thread.kill.join
