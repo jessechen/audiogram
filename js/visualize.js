@@ -14,8 +14,16 @@ $(function() {
                 text: ''
             },
             series: [{
-                data: file.data
-            }]
+              data: file.fft,
+              yAxis: 0
+            },
+            {
+              data: file.signal,
+              yAxis: 1
+            }],
+          yAxis: [{ title: { text: "FFT" } },
+                  { title: { text: "Signal" }, opposite: true }]
         });
+        $("#text").html(file.text);
     });
 });

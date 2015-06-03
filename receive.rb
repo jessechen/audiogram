@@ -18,6 +18,10 @@ def highest_signal(occurrences)
 end
 
 def confidence(window, bit)
+  # exact = 1
+  # with others = 1/N
+  # just others = -N
+  # nothing = 0
   window.reduce(0) {|acc, bits| acc + (bits.include?(bit) ? 1/bits.size : -bits.size) }.to_f / window.size
 end
 
@@ -39,6 +43,8 @@ def process_chunk(chunk)
     ind << i if x > thresh
   end
 
+  print_to_graph(chunk, fft, ind)
+
   # correlate find indices found in the FFT to bits
   bits = []
   PEAK_INDICES.each_with_index do |peak_indices, bit|
@@ -46,6 +52,23 @@ def process_chunk(chunk)
   end
 
   FRACTIONAL_BIT_STREAM.push(bits)
+end
+
+# print FFT and signal data to a JSON file to use to render a graph
+def print_to_graph(chunk, fft, ind)
+  $iter = ($iter || 0) + 1
+  if $iter == 50
+    puts "writing FFT data to file"
+    chunk = chunk.to_a
+    fft = fft.to_a
+    sum = fft.inject(&:+)
+    avg = sum / fft.size
+    max = fft.max
+    File.open("js/data.json", "w") do |f|
+      text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, ind: #{ind.inspect}"
+      f << "{\"fft\":" + fft.inspect + ", \"signal\":" + chunk.inspect + ", \"text\": \"" + text + "\" }"
+    end
+  end
 end
 
 listen_thread = Thread.start do
