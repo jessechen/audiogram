@@ -2,7 +2,7 @@ $(function() {
     $.get("data.json", function(file) {
         $("#graph").highcharts({
             chart: {
-                zoomtype: 'x'
+                zoomType: 'x'
             },
             legend: {
                 enabled: false
