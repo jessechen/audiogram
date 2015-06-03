@@ -48,7 +48,7 @@ listen_thread = Thread.start do
   loop do
     waveform = buf.read(BUFFER_SIZE)
     channel = waveform[0, true]
-    (0...(BUFFER_SIZE/CHUNK_SIZE)).each do |i|
+    (0...CHUNKS_PER_BUFFER).each do |i|
       chunk = channel[i...(i+CHUNK_SIZE)]
       process_chunk(chunk)
     end
@@ -57,11 +57,11 @@ end
 
 process_thread = Thread.start do
   # calibrate
-  window = [0, 0, 0, 0]
+  window = Array.new(CHUNKS_PER_BUFFER, 0)
   while bits = FRACTIONAL_BIT_STREAM.pop
     window = window[1..-1]
-    window << (bits == [1] ? 0.25 : 0)
-    break if window.inject(&:+) == 1
+    window << (bits == [1] ? 1 : 0)
+    break if window.inject(&:+) == CHUNKS_PER_BUFFER
   end
 
   # we're calibrated
@@ -71,7 +71,7 @@ process_thread = Thread.start do
   while bits = FRACTIONAL_BIT_STREAM.pop
     counter += 1
     bits.each {|bit| occurrences[bit] += 1}
-    if counter >= 4
+    if counter >= CHUNKS_PER_BUFFER
       puts highest_signal(occurrences)
       counter = 0
       occurrences = Hash.new(0)
