@@ -13,7 +13,12 @@ buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 FRACTIONAL_BIT_STREAM = Queue.new
 
 def highest_signal(occurrences)
-  (occurrences.max_by {|_, v| v} || []).first
+  return 0 unless occurrences.any?
+  occurrences.max_by {|_, v| v}.first
+end
+
+def confidence(window, bit)
+  window.reduce(0) {|acc, bits| acc + (bits.include?(bit) ? 1/bits.size : -bits.size) }.to_f / window.size
 end
 
 def bits_to_char(bit_array)
@@ -47,7 +52,7 @@ listen_thread = Thread.start do
   loop do
     waveform = buf.read(BUFFER_SIZE)
     channel = waveform[0, true]
-    (0...(BUFFER_SIZE/CHUNK_SIZE)).each do |i|
+    (0...CHUNKS_PER_BUFFER).each do |i|
       chunk = channel[i...(i+CHUNK_SIZE)]
       process_chunk(chunk)
     end
@@ -56,23 +61,24 @@ end
 
 process_thread = Thread.start do
   # calibrate
-  window = [0, 0, 0, 0]
+  window = Array.new(CHUNKS_PER_BUFFER, 0)
   while bits = FRACTIONAL_BIT_STREAM.pop
     window = window[1..-1]
-    window << (bits == [1] ? 0.25 : 0)
-    break if window.inject(&:+) == 1
+    window << (bits == [1] ? 1 : 0)
+    break if window.inject(&:+) == CHUNKS_PER_BUFFER
   end
 
   # we're calibrated
   puts "calibrated"
-  counter = 0
+  window = []
   occurrences = Hash.new(0)
   while bits = FRACTIONAL_BIT_STREAM.pop
-    counter += 1
+    window << bits
     bits.each {|bit| occurrences[bit] += 1}
-    if counter >= 4
-      puts highest_signal(occurrences)
-      counter = 0
+    if window.size >= CHUNKS_PER_BUFFER
+      bit = highest_signal(occurrences)
+      printf "%1d (%2.2f)\n", bit, confidence(window, bit)
+      window = []
       occurrences = Hash.new(0)
     end
   end
