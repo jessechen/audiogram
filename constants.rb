@@ -6,3 +6,9 @@ CHUNK_SIZE  = BUFFER_SIZE / CHUNKS_PER_BUFFER
 
 WARMUP      = 0.1
 DURATION    = 2
+
+# use points in fft this far from peak when calculating signal/noise ratio
+SUM_DISTANCE_FROM_PEAK = 1
+
+CALIBRATION_THRESHOLD = 900000
+BIT_THRESHOLD         = 400000

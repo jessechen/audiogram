@@ -6,11 +6,12 @@ Thread.abort_on_exception = true
 
 PEAK_INDICES = FREQUENCIES.map do |f|
   i = (f.to_f / RATE * CHUNK_SIZE).round
-  [i - 1, i, i + 1]
+  arr = (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
+  arr + arr.map {|x| 1024 - x }
 end
 
 buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
-FRACTIONAL_BIT_STREAM = Queue.new
+MEASUREMENT_STREAM = Queue.new
 
 def highest_signal(occurrences)
   return 0 unless occurrences.any?
@@ -33,29 +34,13 @@ end
 def process_chunk(chunk)
   fft = FFTW3.fft(chunk).real.abs
   arr = fft.to_a
+  area_under_peaks = PEAK_INDICES[1].map {|i| arr[i] }.inject(&:+)
 
-  max = arr.max
-  thresh = max * 0.90
-
-  # find indices in the FFT above the threshold value
-  ind = []
-  arr.each_with_index do |x, i|
-    ind << i if x > thresh
-  end
-
-  print_to_graph(chunk, fft, ind)
-
-  # correlate find indices found in the FFT to bits
-  bits = []
-  PEAK_INDICES.each_with_index do |peak_indices, bit|
-    bits << bit if (ind & peak_indices).any?
-  end
-
-  FRACTIONAL_BIT_STREAM.push(bits)
+  print_to_graph(chunk, fft, area_under_peaks)
+  MEASUREMENT_STREAM.push(area_under_peaks)
 end
 
-# print FFT and signal data to a JSON file to use to render a graph
-def print_to_graph(chunk, fft, ind)
+def print_to_graph(chunk, fft, aup)
   $iter = ($iter || 0) + 1
   chunk = chunk.to_a
   fft = fft.to_a
@@ -63,7 +48,7 @@ def print_to_graph(chunk, fft, ind)
   avg = sum / fft.size
   max = fft.max
   File.open("js/data#{$iter}.json", "w") do |f|
-    text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, ind: #{ind.inspect}"
+    text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, aup: #{aup.round}"
     f << "{\"fft\":" + fft.inspect + ", \"signal\":" + chunk.inspect + ", \"text\": \"" + text + "\" }"
   end
 end
@@ -83,24 +68,26 @@ end
 process_thread = Thread.start do
   # calibrate
   window = Array.new(CHUNKS_PER_BUFFER, 0)
-  while bits = FRACTIONAL_BIT_STREAM.pop
+  while m = MEASUREMENT_STREAM.pop
     window = window[1..-1]
-    window << (bits == [1] ? 1 : 0)
-    break if window.inject(&:+) == CHUNKS_PER_BUFFER
+    window << m
+    average_m = window.inject(&:+) / window.size
+    if average_m > CALIBRATION_THRESHOLD
+      puts "calibrated"
+      MEASUREMENT_STREAM.pop
+      break
+    end
   end
 
   # we're calibrated
-  puts "calibrated"
   window = []
-  occurrences = Hash.new(0)
-  while bits = FRACTIONAL_BIT_STREAM.pop
-    window << bits
-    bits.each {|bit| occurrences[bit] += 1}
+  while m = MEASUREMENT_STREAM.pop
+    window << m
     if window.size >= CHUNKS_PER_BUFFER
-      bit = highest_signal(occurrences)
-      printf "%1d (%2.2f)\n", bit, confidence(window, bit)
+      average_m = window.inject(&:+) / window.size
+      bit = average_m > BIT_THRESHOLD ? 1 : 0
+      puts "bit: #{bit} (m: #{average_m.round})"
       window = []
-      occurrences = Hash.new(0)
     end
   end
 end
