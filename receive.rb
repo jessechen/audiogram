@@ -13,11 +13,11 @@ buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 FRACTIONAL_BIT_STREAM = Queue.new
 
 def highest_signal(occurrences)
-  occurrences.max_by {|_, v| v}.first
+  (occurrences.max_by {|_, v| v} || []).first
 end
 
 def bits_to_char(bit_array)
-  byte = bit_array.reduce(0) {|acc, bit| (acc * 2) + bit}
+  byte = bit_array.reduce(0) {|acc, bit| (acc << 1) + bit}
   [byte].pack("c")
 end
 
