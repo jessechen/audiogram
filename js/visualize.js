@@ -1,5 +1,6 @@
 $(function() {
-    $.get("data.json", function(file) {
+    var dataFileNum = window.location.search.replace("?", "");
+    $.get("data"+dataFileNum+".json", function(file) {
         $("#graph").highcharts({
             chart: {
                 zoomType: 'x'

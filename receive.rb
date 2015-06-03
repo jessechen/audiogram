@@ -57,17 +57,14 @@ end
 # print FFT and signal data to a JSON file to use to render a graph
 def print_to_graph(chunk, fft, ind)
   $iter = ($iter || 0) + 1
-  if $iter == 50
-    puts "writing FFT data to file"
-    chunk = chunk.to_a
-    fft = fft.to_a
-    sum = fft.inject(&:+)
-    avg = sum / fft.size
-    max = fft.max
-    File.open("js/data.json", "w") do |f|
-      text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, ind: #{ind.inspect}"
-      f << "{\"fft\":" + fft.inspect + ", \"signal\":" + chunk.inspect + ", \"text\": \"" + text + "\" }"
-    end
+  chunk = chunk.to_a
+  fft = fft.to_a
+  sum = fft.inject(&:+)
+  avg = sum / fft.size
+  max = fft.max
+  File.open("js/data#{$iter}.json", "w") do |f|
+    text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, ind: #{ind.inspect}"
+    f << "{\"fft\":" + fft.inspect + ", \"signal\":" + chunk.inspect + ", \"text\": \"" + text + "\" }"
   end
 end
 
