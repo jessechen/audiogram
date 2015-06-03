@@ -17,6 +17,10 @@ def highest_signal(occurrences)
   occurrences.max_by {|_, v| v}.first
 end
 
+def confidence(window, bit)
+  window.reduce(0) {|acc, bits| acc + (bits.include?(bit) ? 1/bits.size : -bits.size) }.to_f / window.size
+end
+
 def bits_to_char(bit_array)
   byte = bit_array.reduce(0) {|acc, bit| (acc * 2) + bit}
   [byte].pack("c")
@@ -66,14 +70,15 @@ process_thread = Thread.start do
 
   # we're calibrated
   puts "calibrated"
-  counter = 0
+  window = []
   occurrences = Hash.new(0)
   while bits = FRACTIONAL_BIT_STREAM.pop
-    counter += 1
+    window << bits
     bits.each {|bit| occurrences[bit] += 1}
-    if counter >= CHUNKS_PER_BUFFER
-      puts highest_signal(occurrences)
-      counter = 0
+    if window.size >= CHUNKS_PER_BUFFER
+      bit = highest_signal(occurrences)
+      printf "%1d (%2.2f)\n", bit, confidence(window, bit)
+      window = []
       occurrences = Hash.new(0)
     end
   end
