@@ -7,7 +7,7 @@ Thread.abort_on_exception = true
 PEAK_INDICES = FREQUENCIES.map do |f|
   i = (f.to_f / RATE * CHUNK_SIZE).round
   arr = (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
-  arr + arr.map {|x| 1024 - x }
+  arr + arr.map {|x| CHUNK_SIZE - x }
 end
 
 buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
@@ -36,7 +36,7 @@ def process_chunk(chunk)
   arr = fft.to_a
   area_under_peaks = PEAK_INDICES[1].map {|i| arr[i] }.inject(&:+)
 
-  print_to_graph(chunk, fft, area_under_peaks)
+  # print_to_graph(chunk, fft, area_under_peaks)
   MEASUREMENT_STREAM.push(area_under_peaks)
 end
 
@@ -65,28 +65,96 @@ listen_thread = Thread.start do
   end
 end
 
+def mean(arr)
+  return 0 if arr.size == 0
+  arr.inject(&:+) / arr.size.to_f
+end
+
+def harmonic_mean(arr)
+  return 0 if arr.size == 0
+  1.0 / (arr.map {|x| 1.0 / x }.inject(&:+) / arr.size.to_f)
+end
+
 process_thread = Thread.start do
   # calibrate
-  window = Array.new(CHUNKS_PER_BUFFER, 0)
-  while m = MEASUREMENT_STREAM.pop
-    window = window[1..-1]
-    window << m
-    average_m = window.inject(&:+) / window.size
-    if average_m > CALIBRATION_THRESHOLD
-      puts "calibrated"
-      MEASUREMENT_STREAM.pop
-      break
-    end
+  puts "Waiting for calibration signal..."
+  window = Array.new()
+
+  # load initial window
+  while window.size < CHUNKS_PER_BUFFER
+    window << MEASUREMENT_STREAM.pop
   end
 
+  # start trying to find value
+  means = []
+  calibrating = false
+  calibration_indexes = []
+  while m = MEASUREMENT_STREAM.pop
+    # rotate chunks into window, calculating moving mean
+    window = window[1..-1]
+    window << m
+    means << harmonic_mean(window)
+
+    # once we have a full 2*window of means, process them
+    if means.size == CHUNKS_PER_BUFFER*2
+      if !calibrating and harmonic_mean(means) > CALIBRATION_THRESHOLD
+        puts "Found calibrating signal. Calibrating..."
+        calibrating = true
+      end
+
+      # since we've seen a set of means above the calibration threshold, start figuring out the midpoint index
+      if calibrating
+        # find indexes of min and max of means array
+        min = 100000000
+        max = 0
+        min_index = max_index = mid_index = -1
+        means.each_with_index do |v, i|
+          if v < min
+            min = v
+            min_index = i
+          end
+          if v > max
+            max = v
+            max_index = i
+          end
+        end
+
+        # calculate mid-point between min and max indexes
+        if min_index <= max_index
+          mid_index = (max_index - min_index) / 2.0 + min_index
+        else
+          mid_index = (max_index - min_index + CHUNKS_PER_BUFFER*2) / 2.0 + min_index
+        end
+        calibration_indexes << mid_index
+
+        # wait until we have enough calibration indexes
+        if calibration_indexes.size > (CALIBRATION_SIGNALS * 0.75)
+          # average the middle to get the target index
+          best_calibration_indexes = calibration_indexes.sort[2..-3]
+          calibration_index = (best_calibration_indexes.inject(&:+) / best_calibration_indexes.size).round
+
+          puts "Dropping #{calibration_index} packets to align window..."
+          calibration_index.times { MEASUREMENT_STREAM.pop }
+
+          break
+        end
+      end
+
+      means = []
+    end
+  end
+  puts "Calibration complete."
+
   # we're calibrated
+  real_data = false
+  num_zeros = 0
   window = []
   while m = MEASUREMENT_STREAM.pop
     window << m
-    if window.size >= CHUNKS_PER_BUFFER
-      average_m = window.inject(&:+) / window.size
+    if window.size == CHUNKS_PER_BUFFER
+      average_m = harmonic_mean(window)
       bit = average_m > BIT_THRESHOLD ? 1 : 0
-      puts "bit: #{bit} (m: #{average_m.round})"
+      puts "bit: #{bit} (m: #{average_m.round}), window: #{window.map(&:round).inspect}"
       window = []
     end
   end
