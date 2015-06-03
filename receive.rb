@@ -73,7 +73,8 @@ listen_thread = Thread.start do
     waveform = buf.read(BUFFER_SIZE)
     channel = waveform[0, true]
     (0...CHUNKS_PER_BUFFER).each do |i|
-      chunk = channel[i...(i+CHUNK_SIZE)]
+      start = i*CHUNK_SIZE
+      chunk = channel[start...(start+CHUNK_SIZE)]
       process_chunk(chunk)
     end
   end
