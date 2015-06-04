@@ -1,7 +1,7 @@
 DOT = "·"
 DASH = "–"
 
-MORSE = {
+MORSE_DECODE = {
   [DOT,  DASH]                   => 'A',
   [DASH, DOT,  DOT,  DOT ]       => 'B',
   [DASH, DOT,  DASH, DOT ]       => 'C',
@@ -40,8 +40,10 @@ MORSE = {
   [DASH, DASH, DASH, DASH, DOT ] => '9',
 }
 
+MORSE_ENCODE = MORSE_DECODE.invert
+
 def decode(morse_signals)
-  MORSE[morse_signals] || '?'
+  MORSE_DECODE[morse_signals] || '?'
 end
 
 def bits_to_signals(bits)
@@ -55,5 +57,9 @@ def bits_to_signals(bits)
   bits = bits.gsub(/1{3,}/, DASH) # 3 or more consecutive ones
   bits = bits.gsub(/1+/, DOT)
   bits = bits.gsub(/0+/, '')
-  bits.split(' ').map {|s| s.split('')}
+  bits.split(' ').map {|s| s.chars}
+end
+
+def encode(string)
+  string.chars.map {|char| MORSE_ENCODE[char]}
 end

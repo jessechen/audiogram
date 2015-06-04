@@ -9,21 +9,27 @@ describe 'telegraph' do
   end
 
   it 'should convert bits into morse signal arrays' do
-    expect(bits_to_signals([1])).to eq([[DOT]])
-    expect(bits_to_signals([1, 1, 1])).to eq([[DASH]])
-    expect(bits_to_signals([1, 0, 1])).to eq([[DOT, DOT]])
-    expect(bits_to_signals([1, 0, 1, 1, 1])).to eq([[DOT, DASH]])
+    expect(bits_to_signals "1").to eq([[DOT]])
+    expect(bits_to_signals "111").to eq([[DASH]])
+    expect(bits_to_signals "101").to eq([[DOT, DOT]])
+    expect(bits_to_signals "10111").to eq([[DOT, DASH]])
   end
 
-  it 'should split words on runs of three zeros' do
-    expect(bits_to_signals([1, 0, 0, 0, 1])).to eq([[DOT], [DOT]])
-    expect(bits_to_signals([1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1])).to eq([[DASH, DOT], [DASH], [DOT]])
+  it 'should split characters on runs of three zeros' do
+    expect(bits_to_signals "10001").to eq([[DOT], [DOT]])
+    expect(bits_to_signals "111010001110001").to eq([[DASH, DOT], [DASH], [DOT]])
   end
 
   it 'should treat runs of two ones as dots and runs of four or more ones as dashes' do
-    expect(bits_to_signals([1, 1])).to eq([[DOT]])
-    expect(bits_to_signals([1, 1, 1, 1])).to eq([[DASH]])
-    expect(bits_to_signals([1, 1, 1, 1, 1, 0, 0, 1, 1])).to eq([[DASH, DOT]])
-    expect(bits_to_signals([1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1])).to eq([[DASH], [DOT]])
+    expect(bits_to_signals "11").to eq([[DOT]])
+    expect(bits_to_signals "1111").to eq([[DASH]])
+    expect(bits_to_signals "111110011").to eq([[DASH, DOT]])
+    expect(bits_to_signals "11111000011").to eq([[DASH], [DOT]])
+  end
+
+  it 'should encode strings to morse signal arrays' do
+    expect(encode('E')).to eq([[DOT]])
+    expect(encode('Q')).to eq([[DASH, DASH, DOT, DASH]])
+    expect(encode('HI')).to eq([[DOT, DOT, DOT, DOT], [DOT, DOT]])
   end
 end
