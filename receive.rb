@@ -13,22 +13,19 @@ end
 buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 MEASUREMENT_STREAM = Queue.new
 
-def highest_signal(occurrences)
-  return 0 unless occurrences.any?
-  occurrences.max_by {|_, v| v}.first
-end
-
-def confidence(window, bit)
-  # exact = 1
-  # with others = 1/N
-  # just others = -N
-  # nothing = 0
-  window.reduce(0) {|acc, bits| acc + (bits.include?(bit) ? 1/bits.size : -bits.size) }.to_f / window.size
-end
-
 def bits_to_char(bit_array)
   byte = bit_array.reduce(0) {|acc, bit| (acc << 1) + bit}
   [byte].pack("c")
+end
+
+def mean(arr)
+  return 0 if arr.size == 0
+  arr.inject(&:+) / arr.size.to_f
+end
+
+def harmonic_mean(arr)
+  return 0 if arr.size == 0
+  1.0 / (arr.map {|x| 1.0 / x }.inject(&:+) / arr.size.to_f)
 end
 
 def process_chunk(chunk)
@@ -63,16 +60,6 @@ listen_thread = Thread.start do
       process_chunk(chunk)
     end
   end
-end
-
-def mean(arr)
-  return 0 if arr.size == 0
-  arr.inject(&:+) / arr.size.to_f
-end
-
-def harmonic_mean(arr)
-  return 0 if arr.size == 0
-  1.0 / (arr.map {|x| 1.0 / x }.inject(&:+) / arr.size.to_f)
 end
 
 process_thread = Thread.start do
