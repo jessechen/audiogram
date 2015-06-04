@@ -57,15 +57,3 @@ def bits_to_signals(bits)
   bits = bits.gsub(/0+/, '')
   bits.split(' ').map {|s| s.split('')}
 end
-
-def stream_to_output(stream)
-  current_line = ""
-  while (bit = stream.pop)
-    current_line << bit.to_s
-    if current_line.match(/0{6,}/) # 6 or more consecutive zeros
-      signals = bits_to_signals(current_line.gsub(/0{6,}/, ''))
-      puts signals.map {|s| decode s}.join(" ")
-      current_line = ""
-    end
-  end
-end

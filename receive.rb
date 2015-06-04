@@ -14,6 +14,7 @@ end
 BUF = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 CHUNK_STREAM = Queue.new
+BIT_STREAM = Queue.new
 
 def bits_to_char(bit_array)
   byte = bit_array.reduce(0) {|acc, bit| (acc << 1) + bit}
@@ -85,10 +86,10 @@ listen_thread = Thread.start do
   end
 end
 
-process_thread = Thread.start do
+signal_processing_thread = Thread.start do
   # calibrate
   puts "Waiting for calibration signal..."
-  window = Array.new()
+  window = Array.new
 
   # load initial window
   while window.size < CHUNKS_PER_BUFFER
@@ -99,7 +100,7 @@ process_thread = Thread.start do
   means = []
   calibrating = false
   calibration_indexes = []
-  while m = process_signal(CHUNK_STREAM.pop)
+  while (m = process_signal(CHUNK_STREAM.pop))
     # rotate chunks into window, calculating moving mean
     window = window[1..-1]
     window << m
@@ -165,7 +166,7 @@ process_thread = Thread.start do
   real_data = false
   num_zeroes = 0
   window = []
-  while m = process_signal(CHUNK_STREAM.pop)
+  while (m = process_signal(CHUNK_STREAM.pop))
     window << m
     if window.size == CHUNKS_PER_BUFFER
       average_m = mean(window)
@@ -178,9 +179,25 @@ process_thread = Thread.start do
           real_data = true
           puts "Calibration pattern done, real data starting!"
         end
+      else
+        BIT_STREAM.push(bit)
       end
 
       window = []
+    end
+  end
+end
+
+morse_processing_thread = Thread.start do
+  current_line = ""
+  while (bit = BIT_STREAM.pop)
+    current_line << bit.to_s
+    if current_line.match(/0{6,}/) # 6 or more consecutive zeros
+      signals = bits_to_signals(current_line.gsub(/0{6,}/, ''))
+      puts ""
+      puts signals.map {|s| decode s}.join("")
+      puts ""
+      current_line = ""
     end
   end
 end
@@ -190,4 +207,5 @@ sleep 15
 BUF.stop
 
 listen_thread.kill.join
-process_thread.kill.join
+signal_processing_thread.kill.join
+morse_processing_thread.kill.join
