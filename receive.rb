@@ -93,6 +93,7 @@ process_thread = Thread.start do
     # rotate chunks into window, calculating moving mean
     window = window[1..-1]
     window << m
+    # puts "measurement: #{m.round} window: #{window.map(&:round)}, mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}"
     means << harmonic_mean(window)
 
     # once we have a full 2*window of means, process them
@@ -104,6 +105,7 @@ process_thread = Thread.start do
 
       # since we've seen a set of means above the calibration threshold, start figuring out the midpoint index
       if calibrating
+        # puts "chunk of means: #{means.map(&:round)}"
         # find indexes of min and max of means array
         min = 100000000
         max = 0
@@ -121,16 +123,20 @@ process_thread = Thread.start do
 
         # calculate mid-point between min and max indexes
         if min_index <= max_index
-          mid_index = (max_index - min_index) / 2.0 + min_index
+          mid_index = ((max_index - min_index) / 2).floor + min_index
         else
-          mid_index = (max_index - min_index + CHUNKS_PER_BUFFER*2) / 2.0 + min_index
+          mid_index = (((max_index + CHUNKS_PER_BUFFER*2) - min_index) / 2).floor + min_index
         end
+        mid_index = (mid_index - (CHUNKS_PER_BUFFER/2).floor) % (CHUNKS_PER_BUFFER*2) # step back a few indices to account for SMA, and normalize to calibration buffer length
         calibration_indexes << mid_index
+
+        # puts "min: #{min.round}, minI: #{min_index}, max: #{max.round}, maxI: #{max_index}, max/min: #{(max/min).round}, midI: #{mid_index}"
 
         # wait until we have enough calibration indexes
         if calibration_indexes.size > (CALIBRATION_SIGNALS * 0.75)
           # average the middle to get the target index
           best_calibration_indexes = calibration_indexes.sort[2..-3]
+          # puts "best_calibration_indexes: #{best_calibration_indexes}"
           calibration_index = (best_calibration_indexes.inject(&:+) / best_calibration_indexes.size).round
 
           puts "Dropping #{calibration_index} packets to align window..."
@@ -152,16 +158,16 @@ process_thread = Thread.start do
   while m = MEASUREMENT_STREAM.pop
     window << m
     if window.size == CHUNKS_PER_BUFFER
-      average_m = harmonic_mean(window)
+      average_m = mean(window)
       bit = average_m > BIT_THRESHOLD ? 1 : 0
-      puts "bit: #{bit} (m: #{average_m.round}), window: #{window.map(&:round).inspect}"
+      puts "bit: #{bit} (mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}), window: #{window.map(&:round).inspect}"
       window = []
     end
   end
 end
 
 buf.start
-sleep 5
+sleep 7
 buf.stop
 
 listen_thread.kill.join
