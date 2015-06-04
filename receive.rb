@@ -4,12 +4,6 @@ require "./constants"
 
 Thread.abort_on_exception = true
 
-PEAK_INDICES = FREQUENCIES.map do |f|
-  i = (f.to_f / RATE * CHUNK_SIZE).round
-  arr = (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
-  arr + arr.map {|x| CHUNK_SIZE - x }
-end
-
 BUF = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 CHUNK_STREAM = Queue.new
@@ -32,10 +26,19 @@ end
 def process_signal(signal)
   fft = FFTW3.fft(signal).real.abs
   arr = fft.to_a
-  area_under_peaks = PEAK_INDICES[1].map {|i| arr[i] }.inject(&:+)
+  indices = peak_indices(FREQUENCIES[1], signal.size)
+  area_under_peaks = indices.map {|i| arr[i] }.inject(&:+)
 
   # print_to_graph(signal, fft, area_under_peaks)
   area_under_peaks
+end
+
+# peak_indices for f=1760, s=512:  [19, 20, 21, 493, 492, 491]
+# peak_indices for f=1760, s=4608: [183, 184, 185, 4425, 4424, 4423]
+def peak_indices(target_frequency, sample_size)
+  i = (target_frequency.to_f / RATE * sample_size).round
+  arr = (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
+  arr + arr.map {|x| sample_size - x }
 end
 
 def print_to_graph(signal, fft, aup)
@@ -66,7 +69,7 @@ def file_reader
   File.open("sample.wav", "r") do |f|
     f.each_line do |line|
       if line.size > 0
-        data = NArray[eval(line)]
+        data = NArray.to_na(eval(line))
         yield data
       end
     end
@@ -74,8 +77,8 @@ def file_reader
 end
 
 listen_thread = Thread.start do
-  buf_reader do |data|
-  # file_reader do |data|
+  # buf_reader(true) do |data|
+  file_reader do |data|
     (0...CHUNKS_PER_BUFFER).each do |i|
       start = i*CHUNK_SIZE
       chunk = data[start...(start+CHUNK_SIZE)]
@@ -160,23 +163,88 @@ process_thread = Thread.start do
   end
   puts "Calibration complete."
 
+  methods = {
+    "mean"      => lambda {|w| mean(w.map {|c| process_signal(c) }).round },
+    "mean-2"    => lambda {|w| mean(w[1..-2].map {|c| process_signal(c) }).round },
+    "mean-4"    => lambda {|w| mean(w[2..-3].map {|c| process_signal(c) }).round },
+    "hmean"     => lambda {|w| harmonic_mean(w.map {|c| process_signal(c) }).round },
+    "hmean-2"   => lambda {|w| harmonic_mean(w[1..-2].map {|c| process_signal(c) }).round },
+    "hmean-4"   => lambda {|w| harmonic_mean(w[2..-3].map {|c| process_signal(c) }).round },
+    "combine"   => lambda {|w| process_signal(NArray.to_na(w.map(&:to_a).inject(&:+))).round },
+    "combine-2" => lambda {|w| process_signal(NArray.to_na(w[1..-2].map(&:to_a).inject(&:+))).round },
+    "combine-4" => lambda {|w| process_signal(NArray.to_na(w[2..-3].map(&:to_a).inject(&:+))).round },
+    "amp"       => lambda {|w| w.map(&:to_a).flatten.map(&:abs).inject(&:+).round },
+    "amp-2"     => lambda {|w| w[1..-2].map(&:to_a).flatten.map(&:abs).inject(&:+).round },
+    "amp-4"     => lambda {|w| w[2..-3].map(&:to_a).flatten.map(&:abs).inject(&:+).round },
+    "fftarea"   => lambda {|w| FFTW3.fft(NArray.to_na(w.map(&:to_a).inject(&:+))).real.abs.to_a.inject(&:+).round },
+    "fftarea-2" => lambda {|w| FFTW3.fft(NArray.to_na(w[1..-2].map(&:to_a).inject(&:+))).real.abs.to_a.inject(&:+).round },
+    "fftarea-4" => lambda {|w| FFTW3.fft(NArray.to_na(w[2..-3].map(&:to_a).inject(&:+))).real.abs.to_a.inject(&:+).round },
+  }
+  method_names = methods.map {|name, fn| name }
+  method_results = {}
+
   # we're calibrated
   real_data = false
   num_zeroes = 0
   window = []
-  while m = process_signal(CHUNK_STREAM.pop)
-    window << m
+  windows = []
+  while c = CHUNK_STREAM.pop
+    window << c
     if window.size == CHUNKS_PER_BUFFER
-      average_m = mean(window)
-      bit = average_m > BIT_THRESHOLD ? 1 : 0
-      puts "bit: #{bit} (mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}), window: #{window.map(&:round).inspect}"
+      windows << window
 
-      if !real_data
-        num_zeroes = bit == 1 ? 0 : num_zeroes + 1
-        if num_zeroes >= ZEROES_AFTER_CALIBRATION
-          real_data = true
-          puts "Calibration pattern done, real data starting!"
+      if windows.size == 38
+        data = windows.map do |w|
+          d = {}
+          methods.each {|k, fn| d[k] = fn.call(w) }
+          d
         end
+
+        new_data = []
+        data.each_slice(2) do |d1, d0|
+          new_data << d1
+          new_data << d0
+          dr = {}
+          method_names.each do |k|
+            ratio = (d1[k].to_f / d0[k])
+            dr[k] = ratio.round
+            method_results[k] ||= []
+            method_results[k] << ratio
+          end
+          new_data << dr
+          new_data << nil
+        end
+
+        fmt_s = Array.new(method_names.size, "%10s").join(" ") + "\n\n"
+        fmt_d = Array.new(method_names.size, "%10d").join(" ") + "\n"
+
+        puts ""
+        printf fmt_s, *method_names
+        new_data.each do |d|
+          if d
+            printf fmt_d, *method_names.map {|k| d[k] }
+          else
+            puts ""
+          end
+        end
+
+        puts "mean of ratios"
+        printf fmt_d, *method_names.map {|k| mean(method_results[k]) }
+        puts ""
+
+        puts "harmonic mean of ratios"
+        printf fmt_d, *method_names.map {|k| harmonic_mean(method_results[k]) }
+        puts ""
+
+        puts "# ratios below 5"
+        printf fmt_d, *method_names.map {|k| method_results[k].select {|r| r < 5 }.size }
+        puts ""
+
+        puts "# ratios below 2"
+        printf fmt_d, *method_names.map {|k| method_results[k].select {|r| r < 2 }.size }
+        puts ""
+
+        printf fmt_s, *method_names
       end
 
       window = []
@@ -185,7 +253,7 @@ process_thread = Thread.start do
 end
 
 BUF.start
-sleep 7
+sleep 2
 BUF.stop
 
 listen_thread.kill.join
