@@ -171,13 +171,13 @@ signal_processing_thread = Thread.start do
     if window.size == CHUNKS_PER_BUFFER
       average_m = mean(window)
       bit = average_m > BIT_THRESHOLD ? 1 : 0
-      puts "bit: #{bit} "#" (mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}), window: #{window.map(&:round).inspect}"
 
       if !real_data
         num_zeroes = bit == 1 ? 0 : num_zeroes + 1
         if num_zeroes >= ZEROES_AFTER_CALIBRATION
           real_data = true
           puts "Calibration pattern done, real data starting!"
+          puts ""
         end
       else
         BIT_STREAM.push(bit)
@@ -189,13 +189,13 @@ signal_processing_thread = Thread.start do
 end
 
 morse_processing_thread = Thread.start do
-  current_line = ""
+  current_word = ''
   while (bit = BIT_STREAM.pop)
-    current_line << bit.to_s
-    if current_line.match(/0{6,}/) # 6 or more consecutive zeros
-      signals = bits_to_signals(current_line.gsub(/0{6,}/, ''))
-      puts signals.map {|s| decode s}.join("")
-      current_line = ""
+    current_word << bit.to_s
+    if current_word.match(/0{6,}/) # 6 or more consecutive zeros
+      signals = bits_to_signals(current_word.gsub(/0{6,}/, ''))
+      print(signals.map {|s| decode s}.join('') + ' ')
+      current_word = ''
     end
   end
 end

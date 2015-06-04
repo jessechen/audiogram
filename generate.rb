@@ -8,21 +8,32 @@ VOLUME = 0.4
 
 BUF = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
 
-calibration = [0] * 6 + [1, 0] * CALIBRATION_SIGNALS + [0] * (ZEROES_AFTER_CALIBRATION-1)
-bits = signals_to_bits(encode("anything"))
-data = calibration + bits
-
-freqs = data.map {|i| FREQUENCIES[i] }
+calibration_bits = [0] * 6 + [1, 0] * CALIBRATION_SIGNALS + [0] * (ZEROES_AFTER_CALIBRATION-1)
+DATA_QUEUE = Queue.new
+calibration_bits.each { |bit| DATA_QUEUE << bit }
 
 send_thread = Thread.start do
   sleep WARMUP
 
   i = 0
   wav = NArray.sint(BUFFER_SIZE)
-  freqs.each_with_index do |f, freqs_index|
-    damp_l = (f != ((freqs_index-1) < 0 ? FREQUENCIES[0] : freqs[freqs_index-1]))
-    damp_r = (f != ((freqs_index+1) >= freqs.size ? FREQUENCIES[0] : freqs[freqs_index+1]))
-    phase = Math::PI * 2.0 * f / RATE
+  prev_freq = FREQUENCIES[0]
+  curr_freq = FREQUENCIES[0]
+  next_freq = FREQUENCIES[0]
+
+  while true
+    value = begin
+      DATA_QUEUE.deq(true)
+    rescue ThreadError
+      0
+    end
+    prev_freq = curr_freq
+    curr_freq = next_freq
+    next_freq = FREQUENCIES[value]
+
+    damp_l = (curr_freq != prev_freq)
+    damp_r = (curr_freq != next_freq)
+    phase = Math::PI * 2.0 * curr_freq / RATE
 
     half = BUFFER_SIZE / 2.0
     damp_freq = Math::PI / half
@@ -46,7 +57,7 @@ input_thread = Thread.start do
   while (text_to_send = gets)
     words = text_to_send.strip.split(/\s+/)
     bits = words.map {|word| signals_to_bits(encode(word)) + END_OF_WORD}.flatten
-    puts bits.inspect
+    bits.each { |bit| DATA_QUEUE << bit }
   end
 end
 
