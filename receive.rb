@@ -153,7 +153,7 @@ process_thread = Thread.start do
 
   # we're calibrated
   real_data = false
-  num_zeros = 0
+  num_zeroes = 0
   window = []
   while m = MEASUREMENT_STREAM.pop
     window << m
@@ -161,6 +161,15 @@ process_thread = Thread.start do
       average_m = mean(window)
       bit = average_m > BIT_THRESHOLD ? 1 : 0
       puts "bit: #{bit} (mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}), window: #{window.map(&:round).inspect}"
+
+      if !real_data
+        num_zeroes = bit == 1 ? 0 : num_zeroes + 1
+        if num_zeroes >= ZEROES_AFTER_CALIBRATION
+          real_data = true
+          puts "Calibration pattern done, real data starting!"
+        end
+      end
+
       window = []
     end
   end
