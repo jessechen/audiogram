@@ -51,11 +51,21 @@ def bits_to_signals(bits)
   # end_of_char = 0x3
   # end_of_word = 0x7
 
-  bit_string = bits.join
-  bit_string = bit_string.gsub(/0{3,}/, ' ')  # 3 or more consecutive zeroes
-  bit_string = bit_string.gsub(/1{3,}/, DASH) # 3 or more consecutive ones
-  bit_string = bit_string.gsub(/1+/, DOT)
-  bit_string = bit_string.gsub(/0+/, '')
-  bit_string.split(' ').map {|s| s.split('')}
+  bits = bits.gsub(/0{3,}/, ' ')  # 3 or more consecutive zeros
+  bits = bits.gsub(/1{3,}/, DASH) # 3 or more consecutive ones
+  bits = bits.gsub(/1+/, DOT)
+  bits = bits.gsub(/0+/, '')
+  bits.split(' ').map {|s| s.split('')}
 end
 
+def stream_to_output(stream)
+  current_line = ""
+  while (bit = stream.pop)
+    current_line << bit.to_s
+    if current_line.match(/0{6,}/) # 6 or more consecutive zeros
+      signals = bits_to_signals(current_line.gsub(/0{6,}/, ''))
+      puts signals.map {|s| decode s}.join(" ")
+      current_line = ""
+    end
+  end
+end

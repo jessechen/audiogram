@@ -8,7 +8,7 @@ VOLUME = 0.4
 buf = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
 
 calibration = [0] * 6 + [1, 0] * CALIBRATION_SIGNALS + [0] * (ZEROES_AFTER_CALIBRATION-1)
-data = calibration + [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1]
+data = calibration + [1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1]
 
 freqs = data.map {|i| FREQUENCIES[i] }
 duration = data.length.to_f * BUFFER_SIZE / RATE
