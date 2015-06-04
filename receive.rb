@@ -23,6 +23,20 @@ def harmonic_mean(arr)
   1.0 / (arr.map {|x| 1.0 / x }.inject(&:+) / arr.size.to_f)
 end
 
+def variance(arr)
+  m = mean(arr)
+  sum = arr.inject(0) {|acc, x| acc + (x-m)**2 }
+  sum/(arr.size - 1).to_f
+end
+
+def standard_deviation(arr)
+  Math.sqrt(variance(arr))
+end
+
+def standard_deviation_ratio(arr)
+  standard_deviation(arr) / mean(arr)
+end
+
 def process_signal(signal)
   fft = FFTW3.fft(signal).real.abs
   arr = fft.to_a
@@ -183,7 +197,7 @@ process_thread = Thread.start do
     "fftarea-4" => lambda {|w| FFTW3.fft(NArray.to_na(w[2..-3].map(&:to_a).inject(&:+))).real.abs.to_a.inject(&:+).round },
   }
   method_names = methods.map {|name, fn| name }
-  method_results = {}
+  method_results = { highs: {}, lows: {}, ratios: {} }
 
   # we're calibrated
   real_data = false
@@ -210,8 +224,12 @@ process_thread = Thread.start do
           method_names.each do |k|
             ratio = (d1[k].to_f / d0[k])
             dr[k] = ratio.round
-            method_results[k] ||= []
-            method_results[k] << ratio
+            method_results[:highs][k]  ||= []
+            method_results[:highs][k]  << d1[k]
+            method_results[:lows][k]   ||= []
+            method_results[:lows][k]   << d0[k]
+            method_results[:ratios][k] ||= []
+            method_results[:ratios][k] << ratio
           end
           new_data << dr
           new_data << nil
@@ -219,6 +237,7 @@ process_thread = Thread.start do
 
         fmt_s = Array.new(method_names.size, "%10s").join(" ") + "\n\n"
         fmt_d = Array.new(method_names.size, "%10d").join(" ") + "\n"
+        fmt_f = Array.new(method_names.size, "%10.2f").join(" ") + "\n"
 
         puts ""
         printf fmt_s, *method_names
@@ -230,20 +249,44 @@ process_thread = Thread.start do
           end
         end
 
+        highs  = method_results[:highs]
+        lows   = method_results[:lows]
+        ratios = method_results[:ratios]
+
+        puts "mean of highs"
+        printf fmt_d, *method_names.map {|k| mean(highs[k]) }
+        puts ""
+
+        puts "standard deviation of highs"
+        printf fmt_f, *method_names.map {|k| standard_deviation_ratio(highs[k]) }
+        puts ""
+
+        puts "mean of lows"
+        printf fmt_d, *method_names.map {|k| mean(lows[k]) }
+        puts ""
+
+        puts "standard deviation of lows"
+        printf fmt_f, *method_names.map {|k| standard_deviation_ratio(lows[k]) }
+        puts ""
+
         puts "mean of ratios"
-        printf fmt_d, *method_names.map {|k| mean(method_results[k]) }
+        printf fmt_d, *method_names.map {|k| mean(ratios[k]) }
         puts ""
 
         puts "harmonic mean of ratios"
-        printf fmt_d, *method_names.map {|k| harmonic_mean(method_results[k]) }
+        printf fmt_d, *method_names.map {|k| harmonic_mean(ratios[k]) }
+        puts ""
+
+        puts "standard deviation of ratios"
+        printf fmt_f, *method_names.map {|k| standard_deviation_ratio(ratios[k]) }
         puts ""
 
         puts "# ratios below 5"
-        printf fmt_d, *method_names.map {|k| method_results[k].select {|r| r < 5 }.size }
+        printf fmt_d, *method_names.map {|k| ratios[k].select {|r| r < 5 }.size }
         puts ""
 
         puts "# ratios below 2"
-        printf fmt_d, *method_names.map {|k| method_results[k].select {|r| r < 2 }.size }
+        printf fmt_d, *method_names.map {|k| ratios[k].select {|r| r < 2 }.size }
         puts ""
 
         printf fmt_s, *method_names
