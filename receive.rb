@@ -11,58 +11,12 @@ PEAK_INDICES = FREQUENCIES.map do |f|
 end
 
 buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
-MEASUREMENT_STREAM = Queue.new
 
-def highest_signal(occurrences)
-  return 0 unless occurrences.any?
-  occurrences.max_by {|_, v| v}.first
-end
-
-def confidence(window, bit)
-  # exact = 1
-  # with others = 1/N
-  # just others = -N
-  # nothing = 0
-  window.reduce(0) {|acc, bits| acc + (bits.include?(bit) ? 1/bits.size : -bits.size) }.to_f / window.size
-end
+CHUNK_STREAM = Queue.new
 
 def bits_to_char(bit_array)
   byte = bit_array.reduce(0) {|acc, bit| (acc << 1) + bit}
   [byte].pack("c")
-end
-
-def process_chunk(chunk)
-  fft = FFTW3.fft(chunk).real.abs
-  arr = fft.to_a
-  area_under_peaks = PEAK_INDICES[1].map {|i| arr[i] }.inject(&:+)
-
-  # print_to_graph(chunk, fft, area_under_peaks)
-  MEASUREMENT_STREAM.push(area_under_peaks)
-end
-
-def print_to_graph(chunk, fft, aup)
-  $iter = ($iter || 0) + 1
-  chunk = chunk.to_a
-  fft = fft.to_a
-  sum = fft.inject(&:+)
-  avg = sum / fft.size
-  max = fft.max
-  File.open("js/data#{$iter}.json", "w") do |f|
-    text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, aup: #{aup.round}"
-    f << "{\"fft\":" + fft.inspect + ", \"signal\":" + chunk.inspect + ", \"text\": \"" + text + "\" }"
-  end
-end
-
-listen_thread = Thread.start do
-  loop do
-    waveform = buf.read(BUFFER_SIZE)
-    channel = waveform[0, true]
-    (0...CHUNKS_PER_BUFFER).each do |i|
-      start = i*CHUNK_SIZE
-      chunk = channel[start...(start+CHUNK_SIZE)]
-      process_chunk(chunk)
-    end
-  end
 end
 
 def mean(arr)
@@ -75,6 +29,61 @@ def harmonic_mean(arr)
   1.0 / (arr.map {|x| 1.0 / x }.inject(&:+) / arr.size.to_f)
 end
 
+def process_signal(signal)
+  fft = FFTW3.fft(signal).real.abs
+  arr = fft.to_a
+  area_under_peaks = PEAK_INDICES[1].map {|i| arr[i] }.inject(&:+)
+
+  # print_to_graph(signal, fft, area_under_peaks)
+  area_under_peaks
+end
+
+def print_to_graph(signal, fft, aup)
+  $iter = ($iter || 0) + 1
+  signal = signal.to_a
+  fft = fft.to_a
+  sum = fft.inject(&:+)
+  avg = sum / fft.size
+  max = fft.max
+  File.open("js/data#{$iter}.json", "w") do |f|
+    text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, aup: #{aup.round}"
+    f << "{\"fft\":" + fft.inspect + ", \"signal\":" + signal.inspect + ", \"text\": \"" + text + "\" }"
+  end
+end
+
+def buf_reader(record_to_file = false)
+  f = File.open("sample.wav", "w") if record_to_file
+  loop do
+    waveform = buf.read(BUFFER_SIZE)
+    channel = waveform[0, true]
+    f << channel.to_a.inspect if record_to_file
+    f << "\n" if record_to_file
+    yield channel
+  end
+end
+
+def file_reader
+  File.open("sample.wav", "r") do |f|
+    f.each_line do |line|
+      if line.size > 0
+        data = NArray[eval(line)]
+        yield data
+      end
+    end
+  end
+end
+
+listen_thread = Thread.start do
+  # buf_reader do
+  file_reader do |data|
+    (0...CHUNKS_PER_BUFFER).each do |i|
+      start = i*CHUNK_SIZE
+      chunk = data[start...(start+CHUNK_SIZE)]
+      CHUNK_STREAM << chunk
+    end
+  end
+end
+
 process_thread = Thread.start do
   # calibrate
   puts "Waiting for calibration signal..."
@@ -82,14 +91,14 @@ process_thread = Thread.start do
 
   # load initial window
   while window.size < CHUNKS_PER_BUFFER
-    window << MEASUREMENT_STREAM.pop
+    window << process_signal(CHUNK_STREAM.pop)
   end
 
   # start trying to find value
   means = []
   calibrating = false
   calibration_indexes = []
-  while m = MEASUREMENT_STREAM.pop
+  while m = process_signal(CHUNK_STREAM.pop)
     # rotate chunks into window, calculating moving mean
     window = window[1..-1]
     window << m
@@ -139,8 +148,8 @@ process_thread = Thread.start do
           # puts "best_calibration_indexes: #{best_calibration_indexes}"
           calibration_index = (best_calibration_indexes.inject(&:+) / best_calibration_indexes.size).round
 
-          puts "Dropping #{calibration_index} packets to align window..."
-          calibration_index.times { MEASUREMENT_STREAM.pop }
+          puts "Dropping #{calibration_index} chunks to align window..."
+          calibration_index.times { CHUNK_STREAM.pop }
 
           break
         end
@@ -155,7 +164,7 @@ process_thread = Thread.start do
   real_data = false
   num_zeroes = 0
   window = []
-  while m = MEASUREMENT_STREAM.pop
+  while m = process_signal(CHUNK_STREAM.pop)
     window << m
     if window.size == CHUNKS_PER_BUFFER
       average_m = mean(window)
