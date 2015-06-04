@@ -171,7 +171,7 @@ signal_processing_thread = Thread.start do
     if window.size == CHUNKS_PER_BUFFER
       average_m = mean(window)
       bit = average_m > BIT_THRESHOLD ? 1 : 0
-      puts "bit: #{bit} (mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}), window: #{window.map(&:round).inspect}"
+      puts "bit: #{bit} "#" (mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}), window: #{window.map(&:round).inspect}"
 
       if !real_data
         num_zeroes = bit == 1 ? 0 : num_zeroes + 1
@@ -194,18 +194,23 @@ morse_processing_thread = Thread.start do
     current_line << bit.to_s
     if current_line.match(/0{6,}/) # 6 or more consecutive zeros
       signals = bits_to_signals(current_line.gsub(/0{6,}/, ''))
-      puts ""
       puts signals.map {|s| decode s}.join("")
-      puts ""
       current_line = ""
     end
   end
 end
 
-BUF.start
-sleep 15
-BUF.stop
+# Stop listening on ^C
+Signal.trap('INT') do
+  BUF.stop
+  listen_thread.kill
+  signal_processing_thread.kill
+  morse_processing_thread.kill
+  exit
+end
 
-listen_thread.kill.join
-signal_processing_thread.kill.join
-morse_processing_thread.kill.join
+BUF.start
+
+listen_thread.join
+signal_processing_thread.join
+morse_processing_thread.join
