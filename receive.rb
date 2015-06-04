@@ -10,7 +10,7 @@ PEAK_INDICES = FREQUENCIES.map do |f|
   arr + arr.map {|x| CHUNK_SIZE - x }
 end
 
-buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
+BUF = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 CHUNK_STREAM = Queue.new
 
@@ -54,7 +54,7 @@ end
 def buf_reader(record_to_file = false)
   f = File.open("sample.wav", "w") if record_to_file
   loop do
-    waveform = buf.read(BUFFER_SIZE)
+    waveform = BUF.read(BUFFER_SIZE)
     channel = waveform[0, true]
     f << channel.to_a.inspect if record_to_file
     f << "\n" if record_to_file
@@ -74,8 +74,8 @@ def file_reader
 end
 
 listen_thread = Thread.start do
-  # buf_reader do
-  file_reader do |data|
+  buf_reader do |data|
+  # file_reader do |data|
     (0...CHUNKS_PER_BUFFER).each do |i|
       start = i*CHUNK_SIZE
       chunk = data[start...(start+CHUNK_SIZE)]
@@ -184,9 +184,9 @@ process_thread = Thread.start do
   end
 end
 
-buf.start
+BUF.start
 sleep 7
-buf.stop
+BUF.stop
 
 listen_thread.kill.join
 process_thread.kill.join
