@@ -51,13 +51,34 @@ def print_to_graph(signal, fft, aup)
   end
 end
 
-listen_thread = Thread.start do
+def buf_reader(record_to_file = false)
+  f = File.open("sample.wav", "w") if record_to_file
   loop do
     waveform = buf.read(BUFFER_SIZE)
     channel = waveform[0, true]
+    f << channel.to_a.inspect if record_to_file
+    f << "\n" if record_to_file
+    yield channel
+  end
+end
+
+def file_reader
+  File.open("sample.wav", "r") do |f|
+    f.each_line do |line|
+      if line.size > 0
+        data = NArray[eval(line)]
+        yield data
+      end
+    end
+  end
+end
+
+listen_thread = Thread.start do
+  # buf_reader do
+  file_reader do |data|
     (0...CHUNKS_PER_BUFFER).each do |i|
       start = i*CHUNK_SIZE
-      chunk = channel[start...(start+CHUNK_SIZE)]
+      chunk = data[start...(start+CHUNK_SIZE)]
       CHUNK_STREAM << chunk
     end
   end
