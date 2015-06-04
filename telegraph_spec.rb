@@ -38,4 +38,11 @@ describe 'telegraph' do
     expect(encode('hi?')).to eq([[DOT, DOT, DOT, DOT], [DOT, DOT]])
     expect(encode('u2')).to eq([[DOT, DOT, DASH], [DOT, DOT, DASH, DASH, DASH]])
   end
+
+  it "should convert signals to a bit array" do
+    expect(signals_to_bits([[DOT]])).to eq([1])
+    expect(signals_to_bits([[DASH]])).to eq([1, 1, 1])
+    expect(signals_to_bits([[DASH, DOT]])).to eq([1, 1, 1, 0, 1])
+    expect(signals_to_bits([[DASH, DOT], [DOT, DASH]])).to eq([1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1])
+  end
 end

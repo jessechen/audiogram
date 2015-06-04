@@ -64,3 +64,8 @@ def encode(string)
   string.upcase.tr('^A-Z0-9', '').chars.map {|char| MORSE_ENCODE[char]}
 end
 
+def signals_to_bits(signals)
+  signals.map do |signal|
+    signal.join('0').gsub(DOT, '1').gsub(DASH, '111')
+  end.join('000').chars.map(&:to_i)
+end
