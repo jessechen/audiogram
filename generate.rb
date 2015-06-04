@@ -14,7 +14,7 @@ data = calibration + bits
 
 freqs = data.map {|i| FREQUENCIES[i] }
 
-thread = Thread.start do
+send_thread = Thread.start do
   sleep WARMUP
 
   i = 0
@@ -42,12 +42,22 @@ thread = Thread.start do
   end
 end
 
+input_thread = Thread.start do
+  while (text_to_send = gets)
+    words = text_to_send.strip.split(/\s+/)
+    bits = words.map {|word| signals_to_bits(encode(word)) + END_OF_WORD}.flatten
+    puts bits.inspect
+  end
+end
+
 # Stop listening on ^C
 Signal.trap('INT') do
   BUF.stop
-  thread.kill
+  send_thread.kill
+  input_thread.kill
 end
 
 BUF.start
 
-thread.join
+# send_thread.join
+input_thread.join

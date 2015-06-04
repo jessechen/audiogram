@@ -1,5 +1,6 @@
 DOT = "·"
 DASH = "–"
+END_OF_WORD = [0, 0, 0, 0, 0, 0, 0]
 
 MORSE_DECODE = {
   [DOT,  DASH]                   => 'A',
