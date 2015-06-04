@@ -17,11 +17,11 @@ $(function() {
             series: [{
               data: file.fft,
               yAxis: 0
+            },
+            {
+              data: file.signal,
+              yAxis: 1
             }],
-            // {
-            //   data: file.signal,
-            //   yAxis: 1
-            // }],
           yAxis: [{ title: { text: "FFT" } },
                   { title: { text: "Signal" }, opposite: true }]
         });
