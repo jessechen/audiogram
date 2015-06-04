@@ -206,7 +206,6 @@ Signal.trap('INT') do
   listen_thread.kill
   signal_processing_thread.kill
   morse_processing_thread.kill
-  exit
 end
 
 BUF.start
