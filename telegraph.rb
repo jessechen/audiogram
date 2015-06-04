@@ -39,3 +39,15 @@ MORSE = {
     [DASH, DASH, DASH, DOT,  DOT ] => '8',
     [DASH, DASH, DASH, DASH, DOT ] => '9',
 }
+
+def decode(morse_signals)
+  MORSE[morse_signals] || '?'
+end
+
+def bits_to_signals(bit_fractions)
+  # dot = 1x1
+  # dash = 1x3
+  # end_of_signal = 0x1
+  # end_of_char = 0x3
+  # end_of_word = 0x7
+end
