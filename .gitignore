@@ -1,2 +1,4 @@
 .idea/
 .DS_Store
+js/data.json
+js/data*.json

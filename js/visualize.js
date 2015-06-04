@@ -1,8 +1,9 @@
 $(function() {
-    $.get("data.json", function(file) {
+    var dataFileNum = window.location.search.replace("?", "");
+    $.get("data"+dataFileNum+".json", function(file) {
         $("#graph").highcharts({
             chart: {
-                zoomtype: 'x'
+                zoomType: 'x'
             },
             legend: {
                 enabled: false
@@ -14,8 +15,16 @@ $(function() {
                 text: ''
             },
             series: [{
-                data: file.data
-            }]
+              data: file.fft,
+              yAxis: 0
+            }],
+            // {
+            //   data: file.signal,
+            //   yAxis: 1
+            // }],
+          yAxis: [{ title: { text: "FFT" } },
+                  { title: { text: "Signal" }, opposite: true }]
         });
+        $("#text").html(file.text);
     });
 });
