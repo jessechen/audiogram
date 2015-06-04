@@ -11,7 +11,8 @@ PEAK_INDICES = FREQUENCIES.map do |f|
 end
 
 buf = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
-MEASUREMENT_STREAM = Queue.new
+
+CHUNK_STREAM = Queue.new
 
 def bits_to_char(bit_array)
   byte = bit_array.reduce(0) {|acc, bit| (acc << 1) + bit}
@@ -28,25 +29,25 @@ def harmonic_mean(arr)
   1.0 / (arr.map {|x| 1.0 / x }.inject(&:+) / arr.size.to_f)
 end
 
-def process_chunk(chunk)
-  fft = FFTW3.fft(chunk).real.abs
+def process_signal(signal)
+  fft = FFTW3.fft(signal).real.abs
   arr = fft.to_a
   area_under_peaks = PEAK_INDICES[1].map {|i| arr[i] }.inject(&:+)
 
-  # print_to_graph(chunk, fft, area_under_peaks)
-  MEASUREMENT_STREAM.push(area_under_peaks)
+  # print_to_graph(signal, fft, area_under_peaks)
+  area_under_peaks
 end
 
-def print_to_graph(chunk, fft, aup)
+def print_to_graph(signal, fft, aup)
   $iter = ($iter || 0) + 1
-  chunk = chunk.to_a
+  signal = signal.to_a
   fft = fft.to_a
   sum = fft.inject(&:+)
   avg = sum / fft.size
   max = fft.max
   File.open("js/data#{$iter}.json", "w") do |f|
     text = "sum: #{sum.round}, avg: #{avg.round}, max: #{max.round}, aup: #{aup.round}"
-    f << "{\"fft\":" + fft.inspect + ", \"signal\":" + chunk.inspect + ", \"text\": \"" + text + "\" }"
+    f << "{\"fft\":" + fft.inspect + ", \"signal\":" + signal.inspect + ", \"text\": \"" + text + "\" }"
   end
 end
 
@@ -57,7 +58,7 @@ listen_thread = Thread.start do
     (0...CHUNKS_PER_BUFFER).each do |i|
       start = i*CHUNK_SIZE
       chunk = channel[start...(start+CHUNK_SIZE)]
-      process_chunk(chunk)
+      CHUNK_STREAM << chunk
     end
   end
 end
@@ -69,14 +70,14 @@ process_thread = Thread.start do
 
   # load initial window
   while window.size < CHUNKS_PER_BUFFER
-    window << MEASUREMENT_STREAM.pop
+    window << process_signal(CHUNK_STREAM.pop)
   end
 
   # start trying to find value
   means = []
   calibrating = false
   calibration_indexes = []
-  while m = MEASUREMENT_STREAM.pop
+  while m = process_signal(CHUNK_STREAM.pop)
     # rotate chunks into window, calculating moving mean
     window = window[1..-1]
     window << m
@@ -126,8 +127,8 @@ process_thread = Thread.start do
           # puts "best_calibration_indexes: #{best_calibration_indexes}"
           calibration_index = (best_calibration_indexes.inject(&:+) / best_calibration_indexes.size).round
 
-          puts "Dropping #{calibration_index} packets to align window..."
-          calibration_index.times { MEASUREMENT_STREAM.pop }
+          puts "Dropping #{calibration_index} chunks to align window..."
+          calibration_index.times { CHUNK_STREAM.pop }
 
           break
         end
@@ -142,7 +143,7 @@ process_thread = Thread.start do
   real_data = false
   num_zeroes = 0
   window = []
-  while m = MEASUREMENT_STREAM.pop
+  while m = process_signal(CHUNK_STREAM.pop)
     window << m
     if window.size == CHUNKS_PER_BUFFER
       average_m = mean(window)
