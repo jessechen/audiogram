@@ -53,13 +53,14 @@ def bits_to_signals(bits)
   # end_of_char = 0x3
   # end_of_word = 0x7
 
-  bits = bits.gsub(/0{3,}/, ' ')  # 3 or more consecutive zeros
-  bits = bits.gsub(/1{3,}/, DASH) # 3 or more consecutive ones
-  bits = bits.gsub(/1+/, DOT)
-  bits = bits.gsub(/0+/, '')
+  bits.gsub!(/0{3,}/, ' ')  # 3 or more consecutive zeros
+  bits.gsub!(/1{3,}/, DASH) # 3 or more consecutive ones
+  bits.gsub!(/1+/, DOT)
+  bits.gsub!(/0+/, '')
   bits.split(' ').map {|s| s.chars}
 end
 
 def encode(string)
-  string.chars.map {|char| MORSE_ENCODE[char]}
+  string.upcase.tr('^A-Z0-9', '').chars.map {|char| MORSE_ENCODE[char]}
 end
+

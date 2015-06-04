@@ -32,4 +32,10 @@ describe 'telegraph' do
     expect(encode('Q')).to eq([[DASH, DASH, DOT, DASH]])
     expect(encode('HI')).to eq([[DOT, DOT, DOT, DOT], [DOT, DOT]])
   end
+
+  it "should upcase strings and ignore characters it doesn't know" do
+    expect(encode('e²')).to eq([[DOT]])
+    expect(encode('hi?')).to eq([[DOT, DOT, DOT, DOT], [DOT, DOT]])
+    expect(encode('u2')).to eq([[DOT, DOT, DASH], [DOT, DOT, DASH, DASH, DASH]])
+  end
 end
