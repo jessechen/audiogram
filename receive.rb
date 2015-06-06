@@ -52,7 +52,7 @@ def process_signal(signal)
   indices = peak_indices(FREQUENCIES[1], signal.size)
   area_under_peaks = indices.map {|i| fft[i] }.inject(&:+)
 
-  # print_to_graph(signal, fft, area_under_peaks)
+  # print_to_graph(signal, fft, area_under_peaks.round)
   area_under_peaks
 end
 
@@ -127,16 +127,18 @@ process_thread = Thread.start do
     # rotate chunks into window, calculating moving mean
     window = window[1..-1]
     window << m
+    wmean = mean(window)
+    means << wmean
+
     # puts "measurement: #{m.round} window: #{window.map(&:round)}, mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}"
-    means << harmonic_mean(window)
+
+    if !calibrating and wmean > CALIBRATION_THRESHOLD
+      puts "Found calibrating signal. Calibrating..."
+      calibrating = true
+    end
 
     # once we have a full 2*window of means, process them
     if means.size == CHUNKS_PER_BUFFER*2
-      if !calibrating and harmonic_mean(means) > CALIBRATION_THRESHOLD
-        puts "Found calibrating signal. Calibrating..."
-        calibrating = true
-      end
-
       # since we've seen a set of means above the calibration threshold, start figuring out the midpoint index
       if calibrating
         # puts "chunk of means: #{means.map(&:round)}"
