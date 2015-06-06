@@ -54,7 +54,7 @@ def process_signal(signal)
   indices = peak_indices(FREQUENCIES[1], signal.size)
   area_under_peaks = indices.map {|i| fft[i] }.inject(&:+)
 
-  # print_to_graph(signal, fft, area_under_peaks.round)
+  # print_to_graph(signal, fft, area_under_peaks) if signal.size == BUFFER_SIZE
   area_under_peaks
 end
 
@@ -137,12 +137,10 @@ signal_processing_thread = Thread.start do
     window = window[1..-1]
     window << m
     wmean = mean(window)
+    # puts "measurement: #{m.round} window: #{window.map(&:round)}, mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}"
     means << wmean
 
-    # puts "measurement: #{m.round} window: #{window.map(&:round)}, mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}"
-
-    puts "calibrate? #{wmean.round} (#{CALIBRATION_THRESHOLD})" if ENV['CALIBRATE'] == "true"
-
+    puts "calibrate? #{wmean.round}" if !calibrating and ENV['CALIBRATE'] == "true"
     if !calibrating and wmean > CALIBRATION_THRESHOLD
       puts "Found calibration signal. Calibrating..."
       calibrating = true
@@ -319,17 +317,19 @@ signal_processing_thread = Thread.start do
     end
   end
 
-  while (m = process_signal(CHUNK_STREAM.pop))
-    window << m
+  while (c = CHUNK_STREAM.pop)
+    window << c
     if window.size == CHUNKS_PER_BUFFER
-      average_m = mean(window)
-      bit = average_m > BIT_THRESHOLD ? 1 : 0
+      combined = NArray.to_na(window.map(&:to_a).inject(&:+))
+      measurement = process_signal(combined)
+
+      bit = measurement > BIT_THRESHOLD ? 1 : 0
       if bit == 1
-        min_seen = average_m if average_m < min_seen
+        min_seen = measurement if measurement < min_seen
       else
-        max_seen = average_m if average_m > max_seen
+        max_seen = measurement if measurement > max_seen
       end
-      puts "bit: #{bit}, #{average_m.round} (min: #{min_seen.round}, max: #{max_seen.round})" if ENV['CALIBRATE'] == "true"
+      puts "bit: #{bit}, #{measurement.round} (min: #{min_seen.round}, max: #{max_seen.round})" if ENV['CALIBRATE'] == "true"
 
       if !real_data
         num_zeroes = bit == 1 ? 0 : num_zeroes + 1
