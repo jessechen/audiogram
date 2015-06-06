@@ -57,12 +57,11 @@ def process_signal(signal)
   area_under_peaks
 end
 
-# peak_indices for f=1760, s=512:  [19, 20, 21, 493, 492, 491]
-# peak_indices for f=1760, s=4608: [183, 184, 185, 4425, 4424, 4423]
+# peak_indices for f=1760, s=512:  [19, 20, 21]
+# peak_indices for f=1760, s=4608: [183, 184, 185]
 def peak_indices(target_frequency, sample_size)
   i = (target_frequency.to_f / RATE * sample_size).round
-  arr = (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
-  arr + arr.map {|x| sample_size - x }
+  (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
 end
 
 def print_to_graph(signal, fft, aup)
