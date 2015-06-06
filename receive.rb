@@ -68,7 +68,7 @@ def file_reader(read_from_file)
   File.open(read_from_file, "r") do |f|
     f.each_line do |line|
       if line.size > 0
-        data = NArray[eval(line)]
+        data = NArray.to_na(eval(line))
         yield data
       end
     end
