@@ -188,17 +188,19 @@ signal_processing_thread = Thread.start do
   min_seen = 10000000000
   max_seen = 0
   window = []
-  while (m = process_signal(CHUNK_STREAM.pop))
-    window << m
+  while (c = CHUNK_STREAM.pop)
+    window << c
     if window.size == CHUNKS_PER_BUFFER
-      average_m = mean(window)
-      bit = average_m > BIT_THRESHOLD ? 1 : 0
+      combined = NArray.to_na(window.map(&:to_a).inject(&:+))
+      measurement = process_signal(combined)
+
+      bit = measurement > BIT_THRESHOLD ? 1 : 0
       if bit == 1
-        min_seen = average_m if average_m < min_seen
+        min_seen = measurement if measurement < min_seen
       else
-        max_seen = average_m if average_m > max_seen
+        max_seen = measurement if measurement > max_seen
       end
-      puts "bit: #{bit}, #{average_m.round} (min: #{min_seen.round}, max: #{max_seen.round})" if ENV['CALIBRATE'] == "true"
+      puts "bit: #{bit}, #{measurement.round} (min: #{min_seen.round}, max: #{max_seen.round})" if ENV['CALIBRATE'] == "true"
 
       if !real_data
         num_zeroes = bit == 1 ? 0 : num_zeroes + 1
