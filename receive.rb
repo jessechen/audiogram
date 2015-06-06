@@ -163,7 +163,7 @@ process_thread = Thread.start do
         else
           mid_index = (((max_index + CHUNKS_PER_BUFFER*2) - min_index) / 2).floor + min_index
         end
-        mid_index = (mid_index - (CHUNKS_PER_BUFFER/2).floor) % (CHUNKS_PER_BUFFER*2) # step back a few indices to account for SMA, and normalize to calibration buffer length
+        mid_index = (mid_index - (CHUNKS_PER_BUFFER/2).floor + 1) % (CHUNKS_PER_BUFFER*2) # step back a few indices to account for SMA, and normalize to calibration buffer length
         calibration_indexes << mid_index
 
         # puts "min: #{min.round}, minI: #{min_index}, max: #{max.round}, maxI: #{max_index}, max/min: #{(max/min).round}, midI: #{mid_index}"
