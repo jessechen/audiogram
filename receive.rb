@@ -40,7 +40,7 @@ def process_signal(signal)
   indices = peak_indices(FREQUENCIES[1], signal.size)
   area_under_peaks = indices.map {|i| fft[i] }.inject(&:+)
 
-  # print_to_graph(signal, fft, area_under_peaks)
+  # print_to_graph(signal, fft, area_under_peaks) if signal.size == BUFFER_SIZE
   area_under_peaks
 end
 
