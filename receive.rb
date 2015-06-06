@@ -4,6 +4,16 @@ require "./constants"
 
 Thread.abort_on_exception = true
 
+available_rates = CoreAudio.default_input_device.available_sample_rate.flatten.uniq
+rate = RATE.to_f
+if (!rate || !available_rates.member?(rate))
+  puts "Please enter a valid sample rate. Choose one of the following: #{available_rates.join(', ')}"
+  return -1
+end
+
+CoreAudio.default_input_device(nominal_rate: rate)
+puts "Input device sample rate set to #{rate}"
+
 BUF = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 CHUNK_STREAM = Queue.new
@@ -91,8 +101,8 @@ def file_reader
 end
 
 listen_thread = Thread.start do
-  # buf_reader(true) do |data|
-  file_reader do |data|
+  buf_reader(true) do |data|
+  # file_reader do |data|
     (0...CHUNKS_PER_BUFFER).each do |i|
       start = i*CHUNK_SIZE
       chunk = data[start...(start+CHUNK_SIZE)]

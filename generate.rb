@@ -3,9 +3,17 @@ require "./constants"
 
 Thread.abort_on_exception = true
 
-VOLUME = 0.4
+available_rates = CoreAudio.default_output_device.available_sample_rate.flatten.uniq
+rate = RATE.to_f
+if (!rate || !available_rates.member?(rate))
+  puts "Please enter a valid sample rate. Choose one of the following: #{available_rates.join(', ')}"
+  return -1
+end
 
-buf = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
+CoreAudio.default_output_device(nominal_rate: rate)
+puts "Output device sample rate set to #{rate}"
+
+BUF = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
 
 # calibration = [0] * 6 + [1, 0] * CALIBRATION_SIGNALS + [0] * (ZEROES_AFTER_CALIBRATION-1)
 # data = calibration + [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1]
@@ -39,12 +47,12 @@ thread = Thread.start do
     end
 
     i += BUFFER_SIZE
-    buf << wav
+    BUF << wav
   end
 end
 
-buf.start
+BUF.start
 sleep duration + WARMUP * 2
-buf.stop
+BUF.stop
 
 thread.kill.join
