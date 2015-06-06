@@ -1,5 +1,6 @@
 require "coreaudio"
 require "./constants"
+require "./telegraph"
 
 Thread.abort_on_exception = true
 
@@ -14,24 +15,36 @@ CoreAudio.default_output_device(nominal_rate: rate)
 puts "Output device sample rate set to #{rate}"
 
 BUF = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
+DATA_QUEUE = Queue.new
 
-# calibration = [0] * 6 + [1, 0] * CALIBRATION_SIGNALS + [0] * (ZEROES_AFTER_CALIBRATION-1)
-# data = calibration + [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1]
+# calibration_bits = [0] * 6 + [1, 0] * CALIBRATION_SIGNALS + [0] * (ZEROES_AFTER_CALIBRATION-1)
+# calibration_bits.each { |bit| DATA_QUEUE << bit }
 
-data = [1, 0] * 60
+# test data
+([1, 0] * 100).each { |bit| DATA_QUEUE << bit }
 
-freqs = data.map {|i| FREQUENCIES[i] }
-duration = data.length.to_f * BUFFER_SIZE / RATE
-
-thread = Thread.start do
+send_thread = Thread.start do
   sleep WARMUP
 
   i = 0
   wav = NArray.sint(BUFFER_SIZE)
-  freqs.each_with_index do |f, freqs_index|
-    damp_l = (f != ((freqs_index-1) < 0 ? FREQUENCIES[0] : freqs[freqs_index-1]))
-    damp_r = (f != ((freqs_index+1) >= freqs.size ? FREQUENCIES[0] : freqs[freqs_index+1]))
-    phase = Math::PI * 2.0 * f / RATE
+  prev_freq = FREQUENCIES[0]
+  curr_freq = FREQUENCIES[0]
+  next_freq = FREQUENCIES[0]
+
+  while true
+    value = begin
+      DATA_QUEUE.deq(true)
+    rescue ThreadError
+      0
+    end
+    prev_freq = curr_freq
+    curr_freq = next_freq
+    next_freq = FREQUENCIES[value]
+
+    damp_l = (curr_freq != prev_freq)
+    damp_r = (curr_freq != next_freq)
+    phase = Math::PI * 2.0 * curr_freq / RATE
 
     half = BUFFER_SIZE / 2.0
     damp_freq = Math::PI / half
@@ -51,8 +64,22 @@ thread = Thread.start do
   end
 end
 
-BUF.start
-sleep duration + WARMUP * 2
-BUF.stop
+# input_thread = Thread.start do
+#   while (text_to_send = gets)
+#     words = text_to_send.strip.split(/\s+/)
+#     bits = words.map {|word| signals_to_bits(encode(word)) + END_OF_WORD}.flatten
+#     bits.each { |bit| DATA_QUEUE << bit }
+#   end
+# end
 
-thread.kill.join
+# Stop listening on ^C
+Signal.trap('INT') do
+  BUF.stop
+  send_thread.kill
+  # input_thread.kill
+end
+
+BUF.start
+
+send_thread.join
+# input_thread.join

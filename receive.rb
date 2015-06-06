@@ -1,6 +1,7 @@
 require "coreaudio"
 require "fftw3"
 require "./constants"
+require "./telegraph"
 
 Thread.abort_on_exception = true
 
@@ -17,6 +18,7 @@ puts "Input device sample rate set to #{rate}"
 BUF = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 CHUNK_STREAM = Queue.new
+BIT_STREAM = Queue.new
 
 def bits_to_char(bit_array)
   byte = bit_array.reduce(0) {|acc, bit| (acc << 1) + bit}
@@ -109,10 +111,10 @@ listen_thread = Thread.start do
   end
 end
 
-process_thread = Thread.start do
+signal_processing_thread = Thread.start do
   # calibrate
   puts "Waiting for calibration signal..."
-  window = Array.new()
+  window = Array.new
 
   # load initial window
   while window.size < CHUNKS_PER_BUFFER
@@ -123,7 +125,7 @@ process_thread = Thread.start do
   means = []
   calibrating = false
   calibration_indexes = []
-  while m = process_signal(CHUNK_STREAM.pop)
+  while (m = process_signal(CHUNK_STREAM.pop))
     # rotate chunks into window, calculating moving mean
     window = window[1..-1]
     window << m
@@ -132,8 +134,10 @@ process_thread = Thread.start do
 
     # puts "measurement: #{m.round} window: #{window.map(&:round)}, mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}"
 
+    puts "calibrate? #{wmean.round} (#{CALIBRATION_THRESHOLD})" if ENV['CALIBRATE'] == "true"
+
     if !calibrating and wmean > CALIBRATION_THRESHOLD
-      puts "Found calibrating signal. Calibrating..."
+      puts "Found calibration signal. Calibrating..."
       calibrating = true
     end
 
@@ -212,9 +216,11 @@ process_thread = Thread.start do
   # we're calibrated
   real_data = false
   num_zeroes = 0
+  min_seen = 10000000000
+  max_seen = 0
   window = []
   windows = []
-  while c = CHUNK_STREAM.pop
+  while (c = CHUNK_STREAM.pop)
     window << c
     if window.size == CHUNKS_PER_BUFFER
       windows << window
@@ -305,11 +311,57 @@ process_thread = Thread.start do
       window = []
     end
   end
+
+  while (m = process_signal(CHUNK_STREAM.pop))
+    window << m
+    if window.size == CHUNKS_PER_BUFFER
+      average_m = mean(window)
+      bit = average_m > BIT_THRESHOLD ? 1 : 0
+      if bit == 1
+        min_seen = average_m if average_m < min_seen
+      else
+        max_seen = average_m if average_m > max_seen
+      end
+      puts "bit: #{bit}, #{average_m.round} (min: #{min_seen.round}, max: #{max_seen.round})" if ENV['CALIBRATE'] == "true"
+
+      if !real_data
+        num_zeroes = bit == 1 ? 0 : num_zeroes + 1
+        if num_zeroes >= ZEROES_AFTER_CALIBRATION
+          real_data = true
+          puts "Calibration pattern done, real data starting!"
+          puts ""
+        end
+      else
+        BIT_STREAM.push(bit)
+      end
+
+      window = []
+    end
+  end
+end
+
+morse_processing_thread = Thread.start do
+  current_word = ''
+  while (bit = BIT_STREAM.pop)
+    current_word << bit.to_s
+    if current_word.match(/0{6,}/) # 6 or more consecutive zeros
+      signals = bits_to_signals(current_word.gsub(/0{6,}/, ''))
+      print(signals.map {|s| decode s}.join('') + ' ')
+      current_word = ''
+    end
+  end
+end
+
+# Stop listening on ^C
+Signal.trap('INT') do
+  BUF.stop
+  listen_thread.kill
+  signal_processing_thread.kill
+  morse_processing_thread.kill
 end
 
 BUF.start
-sleep 2
-BUF.stop
 
-listen_thread.kill.join
-process_thread.kill.join
+listen_thread.join
+signal_processing_thread.join
+morse_processing_thread.join
