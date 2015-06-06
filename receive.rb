@@ -32,9 +32,8 @@ def harmonic_mean(arr)
 end
 
 def process_signal(signal)
-  fft = FFTW3.fft(signal).real.abs
-  arr = fft.to_a
-  area_under_peaks = PEAK_INDICES[1].map {|i| arr[i] }.inject(&:+)
+  fft = FFTW3.fft(signal).abs
+  area_under_peaks = PEAK_INDICES[1].map {|i| fft[i] }.inject(&:+)
 
   # print_to_graph(signal, fft, area_under_peaks)
   area_under_peaks
