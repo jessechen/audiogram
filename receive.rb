@@ -122,16 +122,18 @@ signal_processing_thread = Thread.start do
     # rotate chunks into window, calculating moving mean
     window = window[1..-1]
     window << m
+    wmean = harmonic_mean(window)
     # puts "measurement: #{m.round} window: #{window.map(&:round)}, mean: #{mean(window).round}, hmean: #{harmonic_mean(window).round}"
-    means << harmonic_mean(window)
+    means << wmean
+
+    puts "calibrate? #{wmean.round}" if !calibrating and ENV['CALIBRATE'] == "true"
+    if !calibrating and wmean > CALIBRATION_THRESHOLD
+      puts "Found calibrating signal. Calibrating..."
+      calibrating = true
+    end
 
     # once we have a full 2*window of means, process them
     if means.size == CHUNKS_PER_BUFFER*2
-      puts "calibrate? #{harmonic_mean(means).round} (#{CALIBRATION_THRESHOLD})" if ENV['CALIBRATE'] == "true"
-      if !calibrating and harmonic_mean(means) > CALIBRATION_THRESHOLD
-        puts "Found calibrating signal. Calibrating..."
-        calibrating = true
-      end
 
       # since we've seen a set of means above the calibration threshold, start figuring out the midpoint index
       if calibrating
