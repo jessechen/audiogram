@@ -48,7 +48,7 @@ def standard_deviation_ratio(arr)
 end
 
 def process_signal(signal)
-  fft = FFTW3.fft(signal).real.abs
+  fft = FFTW3.fft(signal).abs
   indices = peak_indices(FREQUENCIES[1], signal.size)
   area_under_peaks = indices.map {|i| fft[i] }.inject(&:+)
 
