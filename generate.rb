@@ -4,8 +4,6 @@ require "./telegraph"
 
 Thread.abort_on_exception = true
 
-VOLUME = 0.4
-
 BUF = CoreAudio.default_output_device.output_buffer(BUFFER_SIZE)
 
 calibration_bits = [0] * 6 + [1, 0] * CALIBRATION_SIGNALS + [0] * (ZEROES_AFTER_CALIBRATION-1)

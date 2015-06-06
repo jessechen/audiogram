@@ -109,6 +109,7 @@ signal_processing_thread = Thread.start do
 
     # once we have a full 2*window of means, process them
     if means.size == CHUNKS_PER_BUFFER*2
+      puts "calibrate? #{harmonic_mean(means).round} (#{CALIBRATION_THRESHOLD})" if ENV['CALIBRATE'] == "true"
       if !calibrating and harmonic_mean(means) > CALIBRATION_THRESHOLD
         puts "Found calibrating signal. Calibrating..."
         calibrating = true
@@ -165,12 +166,20 @@ signal_processing_thread = Thread.start do
   # we're calibrated
   real_data = false
   num_zeroes = 0
+  min_seen = 10000000000
+  max_seen = 0
   window = []
   while (m = process_signal(CHUNK_STREAM.pop))
     window << m
     if window.size == CHUNKS_PER_BUFFER
       average_m = mean(window)
       bit = average_m > BIT_THRESHOLD ? 1 : 0
+      if bit == 1
+        min_seen = average_m if average_m < min_seen
+      else
+        max_seen = average_m if average_m > max_seen
+      end
+      puts "bit: #{bit}, #{average_m.round} (min: #{min_seen.round}, max: #{max_seen.round})" if ENV['CALIBRATE'] == "true"
 
       if !real_data
         num_zeroes = bit == 1 ? 0 : num_zeroes + 1
