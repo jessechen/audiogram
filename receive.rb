@@ -11,6 +11,16 @@ PEAK_INDICES = FREQUENCIES.map do |f|
   arr + arr.map {|x| CHUNK_SIZE - x }
 end
 
+available_rates = CoreAudio.default_input_device.available_sample_rate.flatten.uniq
+rate = RATE.to_f
+if (!rate || !available_rates.member?(rate))
+  puts "Please enter a valid sample rate. Choose one of the following: #{available_rates.join(', ')}"
+  return -1
+end
+
+CoreAudio.default_input_device(nominal_rate: rate)
+puts "Input device sample rate set to #{rate}"
+
 BUF = CoreAudio.default_input_device.input_buffer(BUFFER_SIZE)
 
 CHUNK_STREAM = Queue.new
