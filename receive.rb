@@ -49,9 +49,8 @@ end
 
 def process_signal(signal)
   fft = FFTW3.fft(signal).real.abs
-  arr = fft.to_a
   indices = peak_indices(FREQUENCIES[1], signal.size)
-  area_under_peaks = indices.map {|i| arr[i] }.inject(&:+)
+  area_under_peaks = indices.map {|i| fft[i] }.inject(&:+)
 
   # print_to_graph(signal, fft, area_under_peaks)
   area_under_peaks
