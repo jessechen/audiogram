@@ -5,12 +5,6 @@ require "./telegraph"
 
 Thread.abort_on_exception = true
 
-PEAK_INDICES = FREQUENCIES.map do |f|
-  i = (f.to_f / RATE * CHUNK_SIZE).round
-  arr = (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
-  arr + arr.map {|x| CHUNK_SIZE - x }
-end
-
 available_rates = CoreAudio.default_input_device.available_sample_rate.flatten.uniq
 rate = RATE.to_f
 if (!rate || !available_rates.member?(rate))
@@ -43,10 +37,18 @@ end
 
 def process_signal(signal)
   fft = FFTW3.fft(signal).abs
-  area_under_peaks = PEAK_INDICES[1].map {|i| fft[i] }.inject(&:+)
+  indices = peak_indices(FREQUENCIES[1], signal.size)
+  area_under_peaks = indices.map {|i| fft[i] }.inject(&:+)
 
   # print_to_graph(signal, fft, area_under_peaks)
   area_under_peaks
+end
+
+# peak_indices for f=1760, s=512:  [19, 20, 21]
+# peak_indices for f=1760, s=4608: [183, 184, 185]
+def peak_indices(target_frequency, sample_size)
+  i = (target_frequency.to_f / RATE * sample_size).round
+  (i-SUM_DISTANCE_FROM_PEAK..i+SUM_DISTANCE_FROM_PEAK).to_a
 end
 
 def print_to_graph(signal, fft, aup)
